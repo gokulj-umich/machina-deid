@@ -90,7 +90,7 @@ class Registry:
         return list(self.spell.values())
 
     def dump(self, path: str):
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", errors="replace") as f:
             for (kind, _), canon in self.ids.items():
                 f.write(f"{kind}\t{self.evidence[(kind, norm(canon))]}\t{canon}\n")
 

@@ -181,7 +181,7 @@ class Agg:
     def dump(self, path, title, min_files=1, limit=4000, sort_sources=True):
         rows = [(v, e[0], len(e[1]), e[2]) for v, e in self.c.items() if e[0] >= min_files]
         rows.sort(key=lambda r: (-(r[2] if sort_sources else r[1]), -r[1], r[0]))
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", errors="replace") as f:
             f.write(f"# {title}\n# columns: n_sources\tn_files\tvalue\texample_paths\n")
             for v, n, s, ex in rows[:limit]:
                 f.write(f"{s}\t{n}\t{v}\t{' || '.join(ex)}\n")
@@ -214,7 +214,7 @@ def main():
     caps = Agg()
     counts = collections.Counter()
     t0 = time.time()
-    raw = gzip.open(os.path.join(a.out, "raw_scan.jsonl.gz"), "wt", encoding="utf-8")
+    raw = gzip.open(os.path.join(a.out, "raw_scan.jsonl.gz"), "wt", encoding="utf-8", errors="replace")
     with mp.get_context("fork").Pool(a.workers, maxtasksperchild=200) as pool:
         for i, (rel, kind, r) in enumerate(pool.imap_unordered(work, [(root, f) for f in files], chunksize=8)):
             if i % 5000 == 0:
@@ -224,7 +224,7 @@ def main():
             counts[kind] += 1
             if r.get("err"):
                 counts[f"{kind}_err"] += 1
-            raw.write(json.dumps({"p": rel, "k": kind, "r": r}, ensure_ascii=False) + "\n")
+            raw.write(json.dumps({"p": rel, "k": kind, "r": r}) + "\n")
             if kind == "pdf":
                 for k, v in r["meta"].items():
                     if k not in ("format", "encryption", "creationDate", "modDate", "trapped"):
