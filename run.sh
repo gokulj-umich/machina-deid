@@ -20,6 +20,8 @@ fi
 "$WORK/.venv/bin/pip" install -q -r "$HERE/requirements.txt"
 
 # 3. run
+mkdir -p "$WORK/private"
+mkdir -p "$WORK/private"
 OUT="$WORK/attempt-$N"
 if [ -e "$OUT" ]; then echo "[run] $OUT exists; remove it or use a new attempt number"; exit 1; fi
 cd "$HERE"
