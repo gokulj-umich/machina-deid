@@ -58,7 +58,7 @@ def split_owner_repo(comp: str):
 
 
 class Layout:
-    def __init__(self, rel_paths: list[str], extra: list | None = None):
+    def __init__(self, rel_paths: list[str], discovered: list | None = None):
         self.entries: list[tuple[str, str, str]] = []  # (spelling, kind, ident)
         self.repos: dict[str, tuple[str, str]] = {}  # top component -> (owner, repo)
         seen = set()
@@ -79,7 +79,7 @@ class Layout:
                     add(sp, kind, name)
 
         # 2. identities discovered inside the corpus (registry from the scan)
-        for sp, kind, ident in extra or []:
+        for sp, kind, ident in discovered or []:
             add(sp, kind, ident)
 
         tops_gh, tops_gl, domains = set(), set(), set()

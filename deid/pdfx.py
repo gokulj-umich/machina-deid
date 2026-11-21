@@ -100,6 +100,11 @@ def _text_matches(text: str, rep):
 
 
 def _redact_page(page, rep, extra_rx=None) -> int:
+    quick = page.get_text("text")
+    if not quick.strip():
+        return 0
+    if not _text_matches(quick, rep) and not (extra_rx and any(rx.search(quick) for rx, _ in extra_rx)):
+        return 0
     text, boxes = _page_chars(page)
     if not text.strip():
         return 0
