@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Run corpus discovery on the server and publish the reports to the private bucket.
-set -euo pipefail
+set -uo pipefail
 WORK="${WORK:-$HOME/work}"; HERE="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$WORK/reports"; exec > >(tee -a "$WORK/reports/discover-console.log") 2>&1
+echo "[discover] start $(date)"
 BUCKET="${BUCKET:-gs://gocool-reports-50587c90}"
 "$WORK/.venv/bin/pip" install -q pymupdf==1.26.5 olefile==0.47
 OUT="$WORK/reports/r1"; mkdir -p "$OUT"
-"$WORK/.venv/bin/python" "$HERE/tools/discover.py" --input "$WORK/input" --out "$OUT" --workers "$(nproc)" 2>&1 | grep -v Warning | tee "$OUT/run.log"
+if [ ! -s "$OUT/raw_scan.jsonl.gz" ] || [ ! -s "$OUT/summary.txt" ]; then
+  "$WORK/.venv/bin/python" "$HERE/tools/discover.py" --input "$WORK/input" --out "$OUT" --workers "$(nproc)" 2>&1 | grep -v Warning | tee "$OUT/run.log"
+fi
 # sample drawings to look at: PDFs with the most title-block labels
 python3 - "$OUT" <<'PY' > "$OUT/render_list.txt"
 import sys,collections
@@ -23,5 +27,8 @@ for path,_ in c.most_common(400):
 print("\n".join(out))
 PY
 "$WORK/.venv/bin/python" "$HERE/tools/render.py" --input "$WORK/input" --list "$OUT/render_list.txt" --out "$OUT/png" || true
-gcloud storage cp -r "$OUT"/*.tsv "$OUT"/*.txt "$OUT"/*.log "$OUT/png" "$BUCKET/r1/" --quiet
-echo "[discover] PUBLISHED to $BUCKET/r1/"
+if gcloud storage cp -r "$OUT"/*.tsv "$OUT"/*.txt "$OUT"/*.log "$OUT/png" "$BUCKET/r1/" --quiet; then
+  echo "[discover] PUBLISHED to $BUCKET/r1/"
+else
+  echo "[discover] UPLOAD FAILED (reports are in $OUT)"
+fi

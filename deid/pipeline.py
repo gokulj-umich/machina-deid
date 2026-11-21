@@ -81,6 +81,7 @@ def main(argv=None):
     ap.add_argument("--private", required=True)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--limit", type=int, default=0, help="process only the first N files (testing)")
+    ap.add_argument("--scan", default="", help="raw_scan.jsonl.gz from tools/discover.py (identity registry)")
     a = ap.parse_args(argv)
 
     IN = os.path.abspath(a.input)
@@ -98,7 +99,14 @@ def main(argv=None):
     names = files
     if os.path.exists(man):
         names = [l.split("\t", 1)[0] for l in open(man, encoding="utf-8") if l and not l.startswith("#")]
-    LAYOUT = Layout(names)
+    extra = []
+    if a.scan and os.path.exists(a.scan):
+        from .registry import build_from_scan
+        reg = build_from_scan(a.scan)
+        reg.dump(os.path.join(a.private, "registry.tsv"))
+        extra = reg.entries()
+        print(f"[deid] registry: {len(reg.ids)} identities, {len(extra)} spellings from scan", flush=True)
+    LAYOUT = Layout(names, extra)
     print(f"[deid] {len(files)} files, {len(LAYOUT.entries)} identity spellings", flush=True)
     if a.limit:
         files = files[: a.limit]

@@ -179,84 +179,23 @@ def step_header(data: bytes, ctx: Ctx) -> bytes:
 
 # ---------------------------------------------------------------------------
 def pdf_handler(data: bytes, name: str, ctx: Ctx) -> bytes:
+    from .pdfx import rewrite_pdf
+    from .replace import EMAIL_RE
+    extra = [(EMAIL_RE, lambda m: (0, pseudo("email", m.group(0))))]
     try:
-        import pikepdf
-    except ImportError:
-        return apply(data, ctx.rep, fixed=True, binary=True)[0]
-    try:
-        pdf = pikepdf.open(io.BytesIO(data))
-    except Exception as e:  # invalid / encrypted
-        ctx.notes.append((name, f"PDF could not be parsed ({type(e).__name__}); identities replaced in raw bytes only"))
-        return apply(data, ctx.rep, fixed=True, binary=True)[0]
-    changed = False
-    try:
-        info = pdf.docinfo
-        for key in list(info.keys()):
-            k = str(key)
-            try:
-                v = str(info[key])
-            except Exception:
-                continue
-            nv = v
-            if k in ("/Author", "/LastModifiedBy", "/Manager", "/Owner"):
-                nv = v if v.strip().lower() in GENERIC_VALUES else pseudo("person", v.strip())
-            elif k in ("/Company",):
-                nv = v if v.strip().lower() in GENERIC_VALUES else pseudo("org", v.strip())
-            else:
-                nv = apply_text(v, ctx.rep)
-            if nv != v:
-                info[key] = nv
-                changed = True
-        if "/Metadata" in pdf.Root:
-            # XMP duplicates docinfo (author, title, tool history); rebuild it
-            # from the cleaned docinfo instead of keeping original identities.
-            try:
-                with pdf.open_metadata(set_pikepdf_as_editor=False) as meta:
-                    meta.load_from_docinfo(pdf.docinfo, delete_missing=True)
-                    for k in list(meta.keys()):
-                        v = meta.get(k)
-                        if isinstance(v, str):
-                            nv = apply_text(v, ctx.rep)
-                            if nv != v:
-                                meta[k] = nv
-                changed = True
-            except Exception:
-                del pdf.Root["/Metadata"]
-                changed = True
-        # visible text: length-preserving replacement inside page content streams
-        for page in pdf.pages:
-            for obj in _content_streams(page, pikepdf):
-                try:
-                    raw = obj.read_bytes()
-                except Exception:
-                    continue
-                new, n = apply(raw, ctx.rep, fixed=True, text_rules=True)
-                if n:
-                    obj.write(new)
-                    changed = True
-        # embedded file attachments
-        for fname in list(pdf.attachments.keys()):
-            spec = pdf.attachments[fname]
-            try:
-                inner = spec.get_file().read_bytes()
-            except Exception:
-                continue
-            new = process(inner, fname, ctx)
-            newname = ctx.layout.map_member(fname, None)
-            if new != inner or newname != fname:
-                del pdf.attachments[fname]
-                pdf.attachments[newname] = pikepdf.AttachedFileSpec(pdf, new, filename=newname)
-                changed = True
-        if not changed:
-            return apply(data, ctx.rep, fixed=True, binary=True)[0]
-        out = io.BytesIO()
-        pdf.save(out, object_stream_mode=pikepdf.ObjectStreamMode.preserve, compress_streams=True)
-        return apply(out.getvalue(), ctx.rep, fixed=True, binary=True)[0]
+        out, notes = rewrite_pdf(
+            data, ctx.rep,
+            process_member=lambda b, n: process(b, n, ctx),
+            map_name=lambda n: ctx.layout.map_member(n, None),
+            extra_rx=extra,
+        )
+        for msg in notes:
+            ctx.notes.append((name, msg))
     except Exception as e:
-        ctx.notes.append((name, f"PDF rewrite failed ({type(e).__name__}); identities replaced in raw bytes only"))
-        return apply(data, ctx.rep, fixed=True, binary=True)[0]
-    finally:
-        pdf.close()
+        ctx.notes.append((name, f"PDF could not be parsed ({type(e).__name__}); identities replaced in raw bytes only"))
+        out = data
+    # names left in raw bytes (object names, uncompressed metadata copies)
+    return apply(out, ctx.rep, fixed=True, binary=True)[0]
 
 
 def _content_streams(page, pikepdf):
@@ -376,6 +315,9 @@ def process(data: bytes, name: str, ctx: Ctx, repo_ctx=None) -> bytes:
         if e == "gz" and head.startswith(b"\x1f\x8b"):
             inner = gzip.decompress(data)
             return gzip.compress(process(inner, name[:-3], ctx), mtime=0)
+        if head.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            from .ole import rewrite_ole
+            return rewrite_ole(data, ctx.rep)[0]
         if e == "pdf" or head.startswith(b"%PDF"):
             return pdf_handler(data, name, ctx)
         if e in ("step", "stp", "p21", "ste") or head.startswith(b"ISO-10303"):

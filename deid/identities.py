@@ -69,6 +69,8 @@ PREFIX = {
 
 
 def pseudo(kind: str, ident: str) -> str:
+    if ident.startswith("host:"):
+        return f"HOST-{code('org', ident)}"
     if kind == "domain":
         return f"site-{code('domain', ident).lower()}.example"
     if kind == "email":
@@ -78,12 +80,19 @@ def pseudo(kind: str, ident: str) -> str:
 
 
 def fit(p: str, n: int) -> str:
-    """Length-preserving form of a pseudonym (for binary / fixed-width formats)."""
+    """Length-preserving form of a pseudonym (for binary / fixed-width formats).
+
+    Shorter slots get a type letter plus identity-specific code characters, so
+    two different identities never collapse to the same short string and the
+    same identity always gets the same short form.
+    """
     if n <= 0:
         return ""
-    if len(p) >= n:
-        return p[:n]
-    return (p + "X" * n)[:n]
+    if len(p) <= n:
+        return p + " " * (n - len(p))
+    d = hashlib.sha256((_SECRET or b"") + b"\x01" + p.encode("utf-8")).digest()
+    code32 = base64.b32encode(d).decode("ascii")
+    return (p[0] + code32)[:n]
 
 
 # ---------------------------------------------------------------------------
