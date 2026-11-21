@@ -1,3 +1,5 @@
 pyahocorasick==2.3.1
 pikepdf==10.16.0
 py7zr==1.1.4
+pymupdf==1.26.5
+olefile==0.47
