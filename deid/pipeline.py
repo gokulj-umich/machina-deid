@@ -151,7 +151,7 @@ def main(argv=None):
         gc.collect()
     log.close()
 
-    with open(os.path.join(a.private, "path-map.tsv"), "w", encoding="utf-8") as f:
+    with open(os.path.join(a.private, "path-map.tsv"), "w", encoding="utf-8", errors="replace") as f:
         for rel, o in plan:
             f.write(f"{rel}\t{o}\n")
 
@@ -167,7 +167,7 @@ def write_readme(out_dir, notes, n, changed, errors):
     lines = [f"- {p}: {m}" for p, m in sorted(set(notes))]
     body = tpl.replace("{{STATS}}", f"{n} files processed, {changed} modified, {errors} pipeline errors.")
     body = body.replace("{{NOTES}}", "\n".join(lines) if lines else "- none")
-    with open(os.path.join(out_dir, "README.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "README.txt"), "w", encoding="utf-8", errors="replace") as f:
         f.write(body)
 
 

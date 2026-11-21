@@ -135,7 +135,7 @@ def main():
             n_in += 1
             ext_in[os.path.splitext(fn)[1].lower()] += 1
     ext_diff = {e: (ext_in[e], kinds[e]) for e in set(ext_in) | set(kinds) if ext_in[e] != kinds[e]}
-    with open(os.path.join(a.out, "summary.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(a.out, "summary.txt"), "w", encoding="utf-8", errors="replace") as f:
         f.write(f"terms checked: {nterms}\ninput files: {n_in}\noutput files: {len(outs)}\n")
         f.write(f"broken outputs: {len(broken)}\nidentities still present: {len(leak_c)} (in {sum(leak_c.values())} file-hits)\n")
         f.write(f"extension count differences: {json.dumps(ext_diff)[:2000]}\n\nTOP LEAKS\n")
